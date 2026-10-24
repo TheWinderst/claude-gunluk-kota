@@ -1,0 +1,7 @@
+GLM-BAGLAM.md
+.DS_Store
+*.exe
+mac/build/
+windows/build/
+node_modules/
+kopru/
