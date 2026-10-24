@@ -8,11 +8,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { jsonYaz } from './ayar.mjs';
+import { jsonYaz, jsonOku, kok } from './ayar.mjs';
+
+// Kurulumun kaydettigi kalici node yolu (uygulama.json). process.execPath
+// surum klasorunu verir (Homebrew'de Cellar/node/26.4.0); node guncellenince
+// o yol kaybolur ve kanca sessizce olur. Kalici yol varsa o kullanilir.
+function kaliciNode() {
+  const n = jsonOku(path.join(kok(), 'uygulama.json'), null)?.node;
+  return typeof n === 'string' && n && fs.existsSync(n) ? n : process.execPath;
+}
 
 export function kancaKur({
   ayarDosyasi = path.join(os.homedir(), '.claude', 'settings.json'),
-  nodeYolu = process.execPath,
+  nodeYolu = kaliciNode(),
   kancaYolu = fileURLToPath(new URL('./kanca.mjs', import.meta.url)),
   kaldir = false,
 } = {}) {
