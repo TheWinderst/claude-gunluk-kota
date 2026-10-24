@@ -17,7 +17,13 @@ export function durumHesapla({ simdi, ayar, yerel, noktalar, sonHata = null }) {
   const liste = [...(noktalar || [])].sort((a, b) => a.t - b.t);
   const dagilan = dagit(liste, tz, { sifirla: yerel?.sifirla || null });
 
-  const harcanan = yuvarla(dagilan[gun] || 0);
+  // Bugunun payi yalniz GUNCEL pencerenin noktalarindan: sifirlama gunu (or.
+  // Carsamba 08:00) gece yarisindan once eski haftaya yapilan harcama yeni
+  // haftanin gunluk payindan dusmez. Gecmis tum noktalardan hesaplanir.
+  const guncelR = liste.length ? liste[liste.length - 1].r : null;
+  const guncel = guncelR == null ? liste : liste.filter((p) => p.r === guncelR);
+  const bugunDagilan = dagit(guncel, tz, { sifirla: yerel?.sifirla || null });
+  const harcanan = yuvarla(bugunDagilan[gun] || 0);
   const tavan = ayar.tavan;
   const uyariEsigi = ayar.uyari;
   const uyari = harcanan >= uyariEsigi;

@@ -169,3 +169,24 @@ test('hata alani son olcum hatasini tasir, kalan asiri asimda 0da kalir', () => 
   assert.equal(d.hata, 'deneme hatası');
   assert.equal(d.kalan, 0);
 });
+
+test('sifirlama gunu: eski pencerenin gece harcamasi yeni haftanin gunluk payina sayilmaz', async () => {
+  const { durumHesapla } = await import('../durum.mjs');
+  const { gunBaslangici } = await import('../zaman.mjs');
+  const { pencereKimligi } = await import('../defter.mjs');
+  const tz = 'Europe/Berlin';
+  const gece = gunBaslangici('2026-10-28', tz);
+  const sa = (h) => gece + h * 3600000;
+  const rEski = pencereKimligi(sa(8) / 1000);
+  const rYeni = pencereKimligi(sa(8) / 1000 + 7 * 86400);
+  const noktalar = [
+    { t: sa(0.001), u: 90, r: rEski, b5: null, r5: null, k: 'yerel' },
+    { t: sa(7.98), u: 99, r: rEski, b5: null, r5: null, k: 'yerel' },
+    { t: sa(8.5), u: 3, r: rYeni, b5: null, r5: null, k: 'yerel' },
+    { t: sa(9), u: 7, r: rYeni, b5: null, r5: null, k: 'yerel' },
+  ];
+  const ayar = { tavan: 15, uyari: 12, saatDilimi: tz, engel: true, baslangic: '2026-10-28', paylasim: {} };
+  const d = durumHesapla({ simdi: sa(9), ayar, yerel: {}, noktalar });
+  assert.equal(d.harcanan, 7);
+  assert.equal(d.engel, false);
+});

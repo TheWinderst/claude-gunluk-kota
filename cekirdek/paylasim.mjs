@@ -45,9 +45,12 @@ export function noktaDogrula(p, simdi = Date.now()) {
   return true;
 }
 
+const MAKS_NOKTA = 5000;
+
 export function beslemeDogrula(besleme, simdi = Date.now()) {
   if (!besleme || besleme.surum !== 1 || !Array.isArray(besleme.olcumler)) return null;
-  return besleme.olcumler.filter((p) => noktaDogrula(p, simdi));
+  // Yabanci beslemeye tavan: 8 gunluk sikistirilmis gozlem birkac yuzu gecmez.
+  return besleme.olcumler.slice(-MAKS_NOKTA).filter((p) => noktaDogrula(p, simdi));
 }
 
 function ozet(noktalar) {
@@ -141,7 +144,8 @@ export async function oku({ fetchFn = fetch } = {}) {
 async function tekKaynakOku(kaynak, fetchFn, simdi) {
   let yanit;
   try {
-    const url = /^https?:\/\//i.test(kaynak) ? kaynak : `${GIST_API}/${kaynak}`;
+    if (/^http:\/\//i.test(kaynak)) return { hata: 'paylaşım adresi https olmalı' };
+    const url = /^https:\/\//i.test(kaynak) ? kaynak : `${GIST_API}/${kaynak}`;
     yanit = await fetchFn(url, {
       headers: { accept: 'application/vnd.github+json', 'user-agent': 'claude-gunluk-kota' },
       signal: AbortSignal.timeout(8000),

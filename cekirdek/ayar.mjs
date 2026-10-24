@@ -43,7 +43,11 @@ export function jsonOku(dosya, varsayilan = null) {
 export function jsonYaz(dosya, deger) {
   fs.mkdirSync(path.dirname(dosya), { recursive: true });
   const gecici = `${dosya}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 10)}`;
-  fs.writeFileSync(gecici, JSON.stringify(deger, null, 2));
+  // Var olan dosyanin izinleri korunur (or. settings.json 600); yeni dosya 600.
+  let mod = 0o600;
+  try { mod = fs.statSync(dosya).mode & 0o777; } catch { /* dosya yok */ }
+  fs.writeFileSync(gecici, JSON.stringify(deger, null, 2), { mode: mod });
+  fs.chmodSync(gecici, mod);
   fs.renameSync(gecici, dosya);
 }
 
