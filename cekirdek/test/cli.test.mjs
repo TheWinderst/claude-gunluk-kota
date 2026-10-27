@@ -99,6 +99,13 @@ test('ayar tavan 20 kalici olur, ayar yazimi JSON deger alir', async () => {
 
     const goster = await calistir(kok, ornek, ['ayar']);
     assert.equal(JSON.parse(goster.cikti).tavan, 20);
+
+    // Windows kurulumunun yolu: tirnaksiz gist kimligi ic anahtara yazilir.
+    const oku = await calistir(kok, ornek, ['ayar', 'paylasim.oku', '078a0af31443628f21b01e18bab27d48']);
+    assert.equal(oku.kod, 0);
+    const k3 = JSON.parse(fs.readFileSync(path.join(kok, 'ayar.json'), 'utf8'));
+    assert.deepEqual(k3.paylasim, { yayinla: null, oku: '078a0af31443628f21b01e18bab27d48' });
+    assert.equal(k3.tavan, 20);
   } finally {
     temizle(kok);
   }

@@ -3,6 +3,7 @@
 
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { delimiter } from 'node:path';
 import { ayarOku, jsonOku, jsonYaz, yerelYolu, paylasimYolu, olcumlerYolu } from './ayar.mjs';
 
 const GIST_API = 'https://api.github.com/gists';
@@ -60,8 +61,11 @@ function ozet(noktalar) {
 function githubToken(tokenFn) {
   if (process.env.GUNLUK_KOTA_GITHUB_TOKEN) return process.env.GUNLUK_KOTA_GITHUB_TOKEN;
   if (tokenFn) return tokenFn();
+  // LaunchAgent ve tepsi uygulamasi kabuk PATH'ini almaz; gh'nin olagan
+  // kurulum yerleri elle eklenir.
+  const PATH = [process.env.PATH, '/opt/homebrew/bin', '/usr/local/bin'].filter(Boolean).join(delimiter);
   return new Promise((resolve) => {
-    execFile('gh', ['auth', 'token'], { timeout: 5000 }, (hata, cikti) => {
+    execFile('gh', ['auth', 'token'], { timeout: 5000, env: { ...process.env, PATH } }, (hata, cikti) => {
       resolve(hata ? '' : String(cikti || '').trim());
     });
   });

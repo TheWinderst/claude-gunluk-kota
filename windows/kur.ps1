@@ -69,8 +69,8 @@ if ($Tavan -gt 0) {
     Write-Host "    tavan = $Tavan"
 }
 if ($PaylasimOku) {
-    $pd = '{"yayinla":null,"oku":"' + $PaylasimOku + '"}'
-    & $nodeYolu $kota ayar paylasim $pd
+    # JSON arguman yok: Windows PowerShell 5.1 ic tirnaklari yutar.
+    & $nodeYolu $kota ayar paylasim.oku $PaylasimOku
     if ($LASTEXITCODE -ne 0) { Write-Host "HATA: paylasim ayarlanamadi."; exit 1 }
     Write-Host "    paylasim.oku = $PaylasimOku"
 }

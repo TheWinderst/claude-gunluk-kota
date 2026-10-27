@@ -126,8 +126,13 @@ async function ana() {
       deger = JSON.parse(deger);
     } catch { /* düz metin olarak kalsın */ }
     const ayar = ayarOku();
-    if (deger === null) delete ayar[anahtar];
-    else ayar[anahtar] = deger;
+    // "ust.alt" tek seviye ic anahtar: Windows PowerShell 5.1 JSON argumandaki
+    // tirnaklari yuttugu icin kurulum paylasim.oku'yu duz metinle yazar.
+    const [ust, alt] = anahtar.split('.');
+    const hedef = alt ? (ayar[ust] = { ...(ayar[ust] || {}) }) : ayar;
+    const ad = alt || ust;
+    if (deger === null) delete hedef[ad];
+    else hedef[ad] = deger;
     ayarYaz(ayar);
     console.log(`${anahtar} = ${JSON.stringify(deger)}`);
     return 0;
