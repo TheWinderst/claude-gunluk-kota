@@ -125,6 +125,18 @@ async function ana() {
     try {
       deger = JSON.parse(deger);
     } catch { /* düz metin olarak kalsın */ }
+    // Gist kimligi rakamlardan olusabilir: sayiya donmesin.
+    if (anahtar === 'paylasim.oku' && deger !== null && !Array.isArray(deger)) deger = String(argv[2]);
+    const tur = {
+      baslangic: (d) => d === null || (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)),
+      tavan: (d) => typeof d === 'number' && Number.isFinite(d) && d >= 0,
+      uyari: (d) => typeof d === 'number' && Number.isFinite(d) && d >= 0,
+      engel: (d) => typeof d === 'boolean',
+    }[anahtar];
+    if (tur && !tur(deger)) {
+      console.error(`Geçersiz değer: ${anahtar} = ${argv[2]}`);
+      return 1;
+    }
     const ayar = ayarOku();
     // "ust.alt" tek seviye ic anahtar: Windows PowerShell 5.1 JSON argumandaki
     // tirnaklari yuttugu icin kurulum paylasim.oku'yu duz metinle yazar.

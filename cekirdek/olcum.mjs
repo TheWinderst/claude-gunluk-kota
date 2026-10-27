@@ -47,7 +47,8 @@ function tokenBul(platform, ev) {
         const arg = ['find-generic-password', '-s', 'Claude Code-credentials'];
         if (hesap) arg.push('-a', hesap);
         arg.push('-w');
-        const ham = execFileSync('/usr/bin/security', arg, { encoding: 'utf8' });
+        // Keychain onay penceresi acarsa kanca 15 sn'lik sinira kadar beklemesin.
+        const ham = execFileSync('/usr/bin/security', arg, { encoding: 'utf8', timeout: 3000 });
         const t = JSON.parse(ham)?.claudeAiOauth?.accessToken;
         if (t) return t;
       } catch { /* bu hesap adiyla yok */ }

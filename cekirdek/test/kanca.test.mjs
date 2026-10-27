@@ -114,7 +114,8 @@ test('kanca: acma ifadesi bypass acar, sonraki normal istek bloklanmaz', async (
 });
 
 test('kanca: baslangic gelecekteyse asilsa da engellemez', async () => {
-  const yarin = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  // UTC gunu degil Berlin gunu: gece 00:00-01:00 arasinda UTC hala dunu gosterir.
+  const yarin = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date(Date.now() + 86400000));
   const { kok, ornek } = gecisiKur([{ saat: 0, u: 0 }, { saat: 6, u: 18 }], { baslangic: yarin });
   try {
     const r = await kancaCalistir(kok, ornek, 'yine dene bakalim');
@@ -134,5 +135,20 @@ test('kanca: bozuk olcumler.json sessizce yutulur (fail-open)', async () => {
     assert.equal(r.cikti, '', 'bozuk veri is durdurmaz, blok da uretmez');
   } finally {
     fs.rmSync(kok, { recursive: true, force: true });
+  }
+});
+
+test('kanca: acma ifadesi uzun yapistirmada ve kelime icinde engeli kaldirmaz, kisa mesajda kaldirir', async () => {
+  const uzun = 'GÜNLÜK KOTA DOLDU. Devam etmek için yalnız "kota devam" yaz: engel yalnız bu cihazda ve bugün için kalkar. Bunu açıkla';
+  for (const [prompt, acar] of [[uzun, false], ['KOTA DEVAMLILIK raporunu hazırla', false], ['tamam kota devam', true]]) {
+    const { kok, ornek } = gecisiKur([{ saat: 0, u: 0 }, { saat: 6, u: 18 }]);
+    try {
+      const r = await kancaCalistir(kok, ornek, prompt);
+      assert.equal(r.kod, 0);
+      if (acar) assert.equal(r.cikti, '{}', prompt);
+      else assert.equal(JSON.parse(r.cikti).decision, 'block', prompt);
+    } finally {
+      fs.rmSync(kok, { recursive: true, force: true });
+    }
   }
 });

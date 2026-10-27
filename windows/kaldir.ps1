@@ -17,7 +17,7 @@ $nodeYolu = $null
 $uygulamaJson = Join-Path $kook "uygulama.json"
 if (Test-Path $uygulamaJson) {
     try {
-        $u = Get-Content $uygulamaJson -Raw | ConvertFrom-Json
+        $u = Get-Content -LiteralPath $uygulamaJson -Raw -Encoding UTF8 | ConvertFrom-Json
         if ($u.node) { $nodeYolu = $u.node }
     } catch { }
 }

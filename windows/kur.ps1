@@ -16,10 +16,12 @@ param(
 $ErrorActionPreference = "Stop"
 
 function NodeBul {
+    # Her aday surumuyle sinanir: PATH'teki eski Node 16 yeni kurulan 18+'yi golgelemesin.
     $c = Get-Command node -ErrorAction SilentlyContinue
-    if ($c) { return $c.Source }
+    if ($c -and (NodeSurumTamam $c.Source)) { return $c.Source }
     $p = Join-Path $env:ProgramFiles "nodejs\node.exe"
-    if (Test-Path $p) { return $p }
+    if (NodeSurumTamam $p) { return $p }
+    if ($c) { return $c.Source }
     return $null
 }
 function NodeSurumTamam([string]$yol) {
@@ -33,6 +35,8 @@ function NodeSurumTamam([string]$yol) {
 $nodeYolu = NodeBul
 if (-not (NodeSurumTamam $nodeYolu)) {
     Write-Host "Node.js 18+ bulunamadi. Kurmak icin: winget install OpenJS.NodeJS.LTS"
+    # Etkilesimsiz kabukta (or. Claude Code) soru beklemek kurulumu asili birakir.
+    if ([Console]::IsInputRedirected -or $env:CLAUDECODE) { Write-Host "HATA: Once Node.js 18+ kurun, sonra bu betigi yeniden calistirin."; exit 1 }
     $cevap = Read-Host "Node.js simdi kurulsun mu? (E/H)"
     if ($cevap -eq "E" -or $cevap -eq "e") {
         winget install OpenJS.NodeJS.LTS --silent --accept-package-agreements --accept-source-agreements
@@ -107,7 +111,8 @@ if (-not $GostergeYok) {
     Write-Host "6/7 Gosterge atlandi (-GostergeYok)"
 }
 
-# --- 7) Ilk olcum
+# --- 7) Ilk olcum (PS 5.1: Stop altinda yonlendirilen stderr satiri betigi keser)
+$ErrorActionPreference = "Continue"
 $olcCikti = (& $nodeYolu $kota olc 2>$null) | Out-String
 if ($olcCikti.Trim().Length -gt 0) { Write-Host $olcCikti.Trim() }
 try {

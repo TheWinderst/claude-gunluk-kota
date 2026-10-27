@@ -108,3 +108,41 @@ test('bozuk JSON: hata firlatir, dosya degismez', () => {
     fs.rmSync(dizin, { recursive: true, force: true });
   }
 });
+
+test('kur/kaldir: ayni gruptaki baska kanca korunur', () => {
+  const karisik = { hooks: [
+    { type: 'command', command: '/usr/bin/say', args: ['merhaba'] },
+    { type: 'command', command: '/usr/local/bin/node', args: [KANCA_YOLU], timeout: 15 },
+  ] };
+  const { dizin, dosya } = sahneKur({ hooks: { UserPromptSubmit: [karisik] } });
+  try {
+    kancaKur({ ayarDosyasi: dosya, nodeYolu: '/usr/local/bin/node', kancaYolu: KANCA_YOLU });
+    let yazilan = JSON.parse(fs.readFileSync(dosya, 'utf8')).hooks.UserPromptSubmit;
+    const say = (l) => l.flatMap((g) => g.hooks).filter((h) => h.command === '/usr/bin/say').length;
+    const bizim = (l) => l.flatMap((g) => g.hooks).filter((h) => h.args?.[0] === KANCA_YOLU).length;
+    assert.equal(say(yazilan), 1, 'kurulumda baska kanca kalmali');
+    assert.equal(bizim(yazilan), 1, 'bizim kanca tek olmali');
+
+    const r = kancaKur({ ayarDosyasi: dosya, kancaYolu: KANCA_YOLU, kaldir: true });
+    assert.equal(r.kaldirildi, 1);
+    yazilan = JSON.parse(fs.readFileSync(dosya, 'utf8')).hooks.UserPromptSubmit;
+    assert.equal(say(yazilan), 1, 'kaldirmada baska kanca kalmali');
+    assert.equal(bizim(yazilan), 0);
+  } finally {
+    fs.rmSync(dizin, { recursive: true, force: true });
+  }
+});
+
+test('kur: BOMlu ve bos settings.json gecerli sayilir', () => {
+  for (const ham of ['\uFEFF{"model":"ornek"}', '']) {
+    const { dizin, dosya } = sahneKur(ham);
+    try {
+      kancaKur({ ayarDosyasi: dosya, nodeYolu: '/usr/local/bin/node', kancaYolu: KANCA_YOLU });
+      const yazilan = JSON.parse(fs.readFileSync(dosya, 'utf8'));
+      if (ham) assert.equal(yazilan.model, 'ornek');
+      assert.equal(yazilan.hooks.UserPromptSubmit.length, 1);
+    } finally {
+      fs.rmSync(dizin, { recursive: true, force: true });
+    }
+  }
+});

@@ -3,7 +3,7 @@
 
 import { ayarOku, jsonOku, yerelYolu, paylasimYolu, onbellekYolu } from './ayar.mjs';
 import { olcumleriOku, birlestir, dagit } from './defter.mjs';
-import { gunAdi, oncekiGun } from './zaman.mjs';
+import { gunAdi, oncekiGun, sonrakiGun, gunBaslangici } from './zaman.mjs';
 
 const TAZE_MS = 10 * 60000;   // 10 dk: taze olcum sayilma siniri
 
@@ -15,7 +15,19 @@ export function durumHesapla({ simdi, ayar, yerel, noktalar, sonHata = null }) {
   const tz = ayar.saatDilimi || 'Europe/Berlin';
   const gun = gunAdi(simdi, tz);
   const liste = [...(noktalar || [])].sort((a, b) => a.t - b.t);
-  const dagilan = dagit(liste, tz, { sifirla: yerel?.sifirla || null });
+  // Gecmis gun, o gunun sonunda gecerli pencerenin dagitimindan okunur:
+  // sifirlama gunu eski haftanin gece harcamasi yeni haftanin payina eklenmez.
+  const pencereler = new Map();
+  const gecmisPay = (g) => {
+    const son = gunBaslangici(sonrakiGun(g), tz);
+    let p = null;
+    for (let i = liste.length - 1; i >= 0; i--) if (liste[i].t < son) { p = liste[i]; break; }
+    if (!p) return 0;
+    if (!pencereler.has(p.r)) {
+      pencereler.set(p.r, dagit(liste.filter((q) => q.r === p.r), tz, { sifirla: yerel?.sifirla || null }));
+    }
+    return pencereler.get(p.r)[g] || 0;
+  };
 
   // Bugunun payi yalniz GUNCEL pencerenin noktalarindan: sifirlama gunu (or.
   // Carsamba 08:00) gece yarisindan once eski haftaya yapilan harcama yeni
@@ -46,7 +58,7 @@ export function durumHesapla({ simdi, ayar, yerel, noktalar, sonHata = null }) {
   const enEskiGun = enYeni ? gunAdi(liste[0].t, tz) : null;
   let gunIter = oncekiGun(gun);
   for (let i = 0; i < 14; i++) {
-    const deger = yuvarla(dagilan[gunIter] || 0);
+    const deger = yuvarla(gecmisPay(gunIter));
     const kapsam = enEskiGun && gunIter >= enEskiGun;
     if (deger > 0 || kapsam) gecmis[gunIter] = deger;
     gunIter = oncekiGun(gunIter);

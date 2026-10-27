@@ -190,3 +190,46 @@ test('dagit: ayni pencerede belirgin dusus (plan yukseltme) sifirlama sayilir, t
   // 9 (90->99) + 2 (sifirlamadan sonra) + 3 (2->5) = 14; ilk noktanin bugune dusen payi ihmal edilir.
   assert.ok(g['2026-10-24'] >= 14 && g['2026-10-24'] < 14.05, String(g['2026-10-24']));
 });
+
+test('dagit: tek hatali dusuk okuma haftanin tamamini bugune yazmaz (Opus denetimi 28.10.2026)', () => {
+  const tz = 'Europe/Berlin';
+  const gece = gunBaslangici('2026-10-29', tz);
+  const r = pencereKimligi(gece / 1000 + 5 * 86400);
+  const sa = (h) => gece + h * 3600000;
+  const dizi = (degerler) => degerler.map((u, i) => ({ t: sa(1 + i), u, r, k: 'yerel' }));
+  const g1 = dagit(dizi([20, 20, 17, 20, 21]), tz)['2026-10-29'];
+  assert.ok(g1 < 21.01, `20,20,17,20,21: ${g1}`);
+  const g2 = dagit(dizi([40, 37, 40, 37, 40]), tz)['2026-10-29'];
+  assert.ok(g2 < 40.01, `40,37,40,37,40: ${g2}`);
+});
+
+test('dagit: iki kaynagin saat farki sahte sifirlama uretmez', () => {
+  const tz = 'Europe/Berlin';
+  const gece = gunBaslangici('2026-10-29', tz);
+  const r = pencereKimligi(gece / 1000 + 5 * 86400);
+  const dk = (m) => gece + 9 * 3600000 + m * 60000;
+  // Saatte %6 harcama; paylasim (gist) noktalari 40 dk geriden gelir.
+  const n = [];
+  for (let m = 0; m <= 240; m += 10) {
+    n.push({ t: dk(m), u: 30 + Math.floor((m / 60) * 6), r, k: 'yerel' });
+    n.push({ t: dk(m) + 1500, u: 30 + Math.floor((Math.max(0, m - 40) / 60) * 6), r, k: 'paylasim' });
+  }
+  const g = dagit(n, tz)['2026-10-29'];
+  assert.ok(g < 54.01, `saat farkli iki kaynak: ${g}`);
+});
+
+test('olcumEkle: haftalik alan bos gelirse sahte %0 yazilmaz', () => {
+  const kok = fs.mkdtempSync(path.join(os.tmpdir(), 'gunluk-kota-defter-'));
+  process.env.GUNLUK_KOTA_EV = kok;
+  try {
+    olcumEkle({ b7: 40, reset7: 1793170800, b5: 1, reset5: 1793141999 }, Date.now() - 60000);
+    olcumEkle({ b7: null, reset7: null, b5: 2, reset5: 1793141999 }, Date.now());
+    olcumEkle({ b7: 12, reset7: null, b5: 2, reset5: null }, Date.now());
+    const l = olcumleriOku().olcumler;
+    assert.equal(l.length, 1, JSON.stringify(l));
+    assert.equal(l[0].u, 40);
+  } finally {
+    delete process.env.GUNLUK_KOTA_EV;
+    fs.rmSync(kok, { recursive: true, force: true });
+  }
+});

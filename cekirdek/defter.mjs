@@ -30,9 +30,13 @@ export function olcumleriOku() {
 
 // Basarili bir olcumu deftere isler: ekle, sikistir, 10 gundan eskileri at.
 export function olcumEkle(sonuc, simdi = Date.now()) {
-  const u = Number(sonuc?.b7);
-  const r = pencereKimligi(Number(sonuc?.reset7));
-  if (!Number.isFinite(u) || !Number.isFinite(r)) return olcumleriOku();
+  // Haftalik alan yoksa nokta yazilmaz: Number(null) === 0 sahte "%0" yazip
+  // engeli sessizce kaldiriyordu. Sifirlama ani yalniz %0'da eksik olabilir.
+  const u = sonuc?.b7;
+  if (typeof u !== 'number' || !Number.isFinite(u)) return olcumleriOku();
+  const reset7 = sonuc?.reset7;
+  if (!(typeof reset7 === 'number' && Number.isFinite(reset7)) && u > 0) return olcumleriOku();
+  const r = pencereKimligi(typeof reset7 === 'number' && Number.isFinite(reset7) ? reset7 : 0);
   const yeni = {
     t: simdi,
     u,
@@ -90,6 +94,7 @@ export function birlestir(yerelListe, paylasimListe) {
 export function dagit(noktalar, saatDilimi = 'Europe/Berlin', secenek = {}) {
   const gunler = {};
   const M = {};                       // pencere basina kosan maksimum
+  const MK = {};                      // kaynak+pencere basina maksimum (sifirlama tespiti)
   const sf = secenek.sifirla || null; // { gun: "YYYY-MM-DD", an: <ms> }
   let prev = null;
   const sirali = [...(noktalar || [])].sort((a, b) => a.t - b.t);
@@ -131,17 +136,21 @@ export function dagit(noktalar, saatDilimi = 'Europe/Berlin', secenek = {}) {
       inc = Math.max(0, u - (M[r] ?? 0));
     } else {
       s = prev.t;
-      const m = M[r] ?? 0;
-      if (u <= m - ICERDE_SIFIRLAMA) {
+      const mk = MK[`${p.k || 'yerel'}|${r}`] ?? 0;
+      if (u <= mk - ICERDE_SIFIRLAMA && u <= mk / 2) {
         // Pencere ayni ama yuzde belirgin dustu: plan yukseltme ya da genel
         // sifirlama (24.10.2026: Max 5x -> 20x gecisinde %99 -> %2 oldu,
         // resets_at degismedi). Taban sifirlanir; yeni yuzde sifirlamadan
-        // sonraki harcamadir. Yuvarlama titremesi (1 puan) buraya dusmez.
+        // sonraki harcamadir. Dusus yalniz ayni kaynagin kendi dizisinde ve
+        // yarinin altina inince sayilir: tek hatali okuma ya da iki makinenin
+        // saat farki (gist gecikmesi) haftanin tamamini bugune yazmasin.
         M[r] = 0;
+        for (const a of Object.keys(MK)) if (a.endsWith(`|${r}`)) MK[a] = 0;
       }
       inc = Math.max(0, u - (M[r] ?? 0));
     }
     M[r] = Math.max(M[r] ?? 0, u);
+    MK[`${p.k || 'yerel'}|${r}`] = Math.max(MK[`${p.k || 'yerel'}|${r}`] ?? 0, u);
     isle(inc, s, t);
     prev = p;
   }

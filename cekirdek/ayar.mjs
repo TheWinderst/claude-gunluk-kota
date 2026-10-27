@@ -48,7 +48,20 @@ export function jsonYaz(dosya, deger) {
   try { mod = fs.statSync(dosya).mode & 0o777; } catch { /* dosya yok */ }
   fs.writeFileSync(gecici, JSON.stringify(deger, null, 2), { mode: mod });
   fs.chmodSync(gecici, mod);
-  fs.renameSync(gecici, dosya);
+  // Windows'ta antivirus/indeksleyici dosyayi kisa sure tutabilir: EPERM/EBUSY/EACCES'te
+  // 50 ms arayla 5 kez denenir; olmazsa gecici dosya silinip hata yukari gider.
+  for (let i = 0; ; i++) {
+    try {
+      fs.renameSync(gecici, dosya);
+      return;
+    } catch (e) {
+      if (i >= 4 || !['EPERM', 'EBUSY', 'EACCES'].includes(e?.code)) {
+        try { fs.rmSync(gecici, { force: true }); } catch { /* onemli degil */ }
+        throw e;
+      }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+    }
+  }
 }
 
 // Ayarlari oku: ust uste VARSAYILANLAR ile birlestirir, bozuk dosya sorun etmez.

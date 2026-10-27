@@ -7,6 +7,10 @@ import { delimiter } from 'node:path';
 import { ayarOku, jsonOku, jsonYaz, yerelYolu, paylasimYolu, olcumlerYolu } from './ayar.mjs';
 
 const GIST_API = 'https://api.github.com/gists';
+// Ham gist adresi GitHub API'nin anonim saatlik 60 istek sinirina girmez (CDN
+// onbellegi ~5 dk). Cipla kimlikte once bu denenir, olmazsa API'ye dusulur.
+const GIST_HAM = 'https://gist.githubusercontent.com/raw';
+const VARSAYILAN_DOSYA = 'gunluk-kota.json';
 const GUN_MS = 86400000;
 const ARALIK_MS = 5 * 60000;   // iki yayin/okuma arasindaki en az sure
 
@@ -35,10 +39,9 @@ export function beslemeKur(simdi = Date.now()) {
 // simdi+5dk] icinde (ms), r [simdi-8g, simdi+8g] icinde (saniye). Gecersiz
 // sessizce atilir.
 export function noktaDogrula(p, simdi = Date.now()) {
-  const t = Number(p?.t);
-  const u = Number(p?.u);
-  const r = Number(p?.r);
-  if (![t, u, r].every(Number.isFinite)) return false;
+  // Tur katidir: "50", null, [7] gibi sayiya donusen degerler kabul edilmez.
+  if (![p?.t, p?.u, p?.r].every((x) => typeof x === 'number' && Number.isFinite(x))) return false;
+  const { t, u, r } = p;
   if (u < 0 || u > 100) return false;
   if (t < simdi - 11 * GUN_MS || t > simdi + 5 * 60000) return false;
   const rs = simdi / 1000;
@@ -51,7 +54,7 @@ const MAKS_NOKTA = 5000;
 export function beslemeDogrula(besleme, simdi = Date.now()) {
   if (!besleme || besleme.surum !== 1 || !Array.isArray(besleme.olcumler)) return null;
   // Yabanci beslemeye tavan: 8 gunluk sikistirilmis gozlem birkac yuzu gecmez.
-  return besleme.olcumler.slice(-MAKS_NOKTA).filter((p) => noktaDogrula(p, simdi));
+  return besleme.olcumler.filter((p) => noktaDogrula(p, simdi)).slice(-MAKS_NOKTA);
 }
 
 function ozet(noktalar) {
@@ -139,18 +142,31 @@ export async function oku({ fetchFn = fetch } = {}) {
     }
   }
   const birlesik = Object.values(yeniKaynaklar).flatMap((k) => k.olcumler);
-  if (!Object.keys(yeniKaynaklar).length) return { hata: hatalar.join('; ') };
+  if (!Object.keys(yeniKaynaklar).length) {
+    // Hata da vadeyi kurar: ulasilamayan kaynak dakikada bir yeniden denenmez.
+    yerelGuncelle({ okumaZaman: new Date(simdi).toISOString() });
+    return { hata: hatalar.join('; ') };
+  }
   jsonYaz(paylasimYolu(), { alindi: new Date(simdi).toISOString(), kaynaklar: yeniKaynaklar, olcumler: birlesik });
   yerelGuncelle({ okumaZaman: new Date(simdi).toISOString() });
   return hatalar.length ? { sayi: birlesik.length, hata: hatalar.join('; ') } : { sayi: birlesik.length };
 }
 
 async function tekKaynakOku(kaynak, fetchFn, simdi) {
+  if (!/^https?:\/\//i.test(kaynak)) {
+    const ham = await adresOku(`${GIST_HAM}/${encodeURIComponent(kaynak)}/${VARSAYILAN_DOSYA}`, fetchFn, simdi);
+    if (!ham.hata) return ham;
+    const api = await adresOku(`${GIST_API}/${encodeURIComponent(kaynak)}`, fetchFn, simdi);
+    return api.hata ? { hata: `${ham.hata}; ${api.hata}` } : api;
+  }
+  return adresOku(kaynak, fetchFn, simdi);
+}
+
+async function adresOku(kaynak, fetchFn, simdi) {
   let yanit;
   try {
     if (/^http:\/\//i.test(kaynak)) return { hata: 'paylaşım adresi https olmalı' };
-    const url = /^https:\/\//i.test(kaynak) ? kaynak : `${GIST_API}/${kaynak}`;
-    yanit = await fetchFn(url, {
+    yanit = await fetchFn(kaynak, {
       headers: { accept: 'application/vnd.github+json', 'user-agent': 'claude-gunluk-kota' },
       signal: AbortSignal.timeout(8000),
     });

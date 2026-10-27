@@ -190,3 +190,24 @@ test('sifirlama gunu: eski pencerenin gece harcamasi yeni haftanin gunluk payina
   assert.equal(d.harcanan, 7);
   assert.equal(d.engel, false);
 });
+
+test('gecmis: sifirlama gunu ertesi gun yalniz yeni haftanin payini gosterir', async () => {
+  const { durumHesapla } = await import('../durum.mjs');
+  const { gunBaslangici } = await import('../zaman.mjs');
+  const { pencereKimligi } = await import('../defter.mjs');
+  const tz = 'Europe/Berlin';
+  const gece = gunBaslangici('2026-10-28', tz);
+  const sa = (h) => gece + h * 3600000;
+  const rEski = pencereKimligi(sa(8) / 1000);
+  const rYeni = pencereKimligi(sa(8) / 1000 + 7 * 86400);
+  const noktalar = [
+    { t: sa(0.001), u: 80, r: rEski, b5: null, r5: null, k: 'yerel' },
+    { t: sa(7.98), u: 93, r: rEski, b5: null, r5: null, k: 'yerel' },
+    { t: sa(8.5), u: 3, r: rYeni, b5: null, r5: null, k: 'yerel' },
+    { t: sa(20), u: 15, r: rYeni, b5: null, r5: null, k: 'yerel' },
+    { t: sa(24 + 9), u: 16, r: rYeni, b5: null, r5: null, k: 'yerel' },
+  ];
+  const ayar = { tavan: 15, uyari: 12, saatDilimi: tz, engel: true, baslangic: '2026-10-28', paylasim: {} };
+  const d = durumHesapla({ simdi: sa(24 + 9), ayar, yerel: {}, noktalar });
+  assert.ok(d.gecmis['2026-10-28'] < 16, `28.10 gecmisi: ${d.gecmis['2026-10-28']}`);
+});

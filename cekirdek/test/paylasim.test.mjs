@@ -127,7 +127,11 @@ test('oku: gist yanitindan besleme ayiklanir, gecersizler dusulur, paylasim.json
         { t: 'x', u: 10, r: 1 },             // gecersiz t
       ],
     };
+    const istenen = [];
     const fetchFn = async (url) => {
+      istenen.push(url);
+      // Ham adres yoksa (404) API'ye dusulur.
+      if (url.startsWith('https://gist.githubusercontent.com/')) return { ok: false, status: 404 };
       assert.equal(url, 'https://api.github.com/gists/def456');
       return {
         ok: true, status: 200,
@@ -141,6 +145,10 @@ test('oku: gist yanitindan besleme ayiklanir, gecersizler dusulur, paylasim.json
     };
     const s = await oku({ fetchFn });
     assert.equal(s.sayi, 1, 'yalniz gecerli nokta kalmali');
+    assert.deepEqual(istenen, [
+      'https://gist.githubusercontent.com/raw/def456/gunluk-kota.json',
+      'https://api.github.com/gists/def456',
+    ], 'once ham adres, sonra API');
 
     const kayit = JSON.parse(fs.readFileSync(path.join(kok, 'paylasim.json'), 'utf8'));
     assert.ok(kayit.alindi);
@@ -168,5 +176,43 @@ test('durum: en yeni nokta paylasimdan geldiyse kaynak paylasimdir', () => {
     assert.equal(d.gozlemSayisi, 2);
   } finally {
     temizle(kok);
+  }
+});
+
+test('oku: cipla kimlikte ham adres API kotasina girmeden okunur', async () => {
+  const now = Date.now();
+  const kok = kokKur({ ayarUzerine: { oku: 'abc123' } });
+  try {
+    const besleme = { surum: 1, olcumler: [{ t: now - 60000, u: 30, r: Math.round((now + GUN) / 1000 / 600) * 600 }] };
+    const istenen = [];
+    const fetchFn = async (url) => {
+      istenen.push(url);
+      return { ok: true, status: 200, json: async () => besleme };
+    };
+    const s = await oku({ fetchFn });
+    assert.equal(s.sayi, 1);
+    assert.deepEqual(istenen, ['https://gist.githubusercontent.com/raw/abc123/gunluk-kota.json']);
+  } finally {
+    temizle(kok);
+  }
+});
+
+test('oku: kaynak hic okunamazsa da vade kurulur, dakikada bir yeniden denenmez', async () => {
+  const kok = kokKur({ ayarUzerine: { oku: 'abc123' } });
+  try {
+    const s = await oku({ fetchFn: async () => ({ ok: false, status: 403 }) });
+    assert.ok(s.hata);
+    const yerel = JSON.parse(fs.readFileSync(path.join(kok, 'yerel.json'), 'utf8'));
+    assert.ok(yerel.okumaZaman, 'hata da okumaZaman yazmali');
+  } finally {
+    temizle(kok);
+  }
+});
+
+test('noktaDogrula sayiya donusen ama sayi olmayan degerleri atar', () => {
+  const now = Date.now();
+  const gecerli = { t: now - 3600000, u: 10, r: Math.round((now + 3 * GUN) / 1000 / 600) * 600 };
+  for (const bozuk of [{ u: '50' }, { u: null }, { u: true }, { u: [7] }, { t: String(gecerli.t) }]) {
+    assert.equal(noktaDogrula({ ...gecerli, ...bozuk }, now), false, JSON.stringify(bozuk));
   }
 });

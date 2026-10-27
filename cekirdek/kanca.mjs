@@ -21,9 +21,21 @@ function normalize(metin) {
     .trim();
 }
 
+// Ifade yalniz kisa mesajda ve tam kelime olarak sayilir: engel metnini ya da
+// README'yi yapistirmak, "kota devamlilik" gibi kelimeler engeli kaldirmaz;
+// sesle yazilan "tamam kota devam" gecer.
+const ACMA_EN_UZUN = 60;
+const harfMi = (c) => /[\p{L}\p{N}]/u.test(c);
 function acmaIfadesiMi(prompt, ifadeler) {
   const p = normalize(prompt);
-  return (ifadeler || []).some((ifade) => ifade && p.includes(normalize(ifade)));
+  return (ifadeler || []).some((ifade) => {
+    const i = ifade ? normalize(ifade) : '';
+    if (!i || p.length > Math.max(ACMA_EN_UZUN, i.length + 30)) return false;
+    for (let k = p.indexOf(i); k >= 0; k = p.indexOf(i, k + 1)) {
+      if (!harfMi(p.charAt(k - 1)) && !harfMi(p.charAt(k + i.length))) return true;
+    }
+    return false;
+  });
 }
 
 function bugunlukBypassAc() {
@@ -43,7 +55,7 @@ function blokMesaji(d) {
   return 'GÜNLÜK KOTA DOLDU\n\n'
     + `Bugün (${d.gun}) haftalık kotadan %${turkceSayi(d.harcanan)} harcandı; günlük tavan %${turkceSayi(d.tavan)}.\n`
     + 'İstek gönderilmedi.\n\n'
-    + 'Devam etmek için mesajına "kota devam" yaz: engel yalnız bu cihazda ve bugün için kalkar.\n'
+    + 'Devam etmek için yalnız "kota devam" yaz: engel yalnız bu cihazda ve bugün için kalkar.\n'
     + `Sayaç 00:00'da (${d.saatDilimi}) yenilenir.`;
 }
 
@@ -70,7 +82,7 @@ async function calis(ham) {
     return;
   }
 
-  await tazele();
+  try { await tazele(); } catch { /* olcum yazilamadi: eldeki veriyle karar */ }
 
   const d = durum();
   if (d.engel) {

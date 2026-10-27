@@ -30,9 +30,10 @@ export function kancaKur({
   let ayar = null;
   let dosyaVardi = false;
   try {
-    const ham = fs.readFileSync(ayarDosyasi, 'utf8');
+    // Windows PowerShell 5.1'in yazdigi BOM ve bos dosya gecerli sayilir.
+    const ham = fs.readFileSync(ayarDosyasi, 'utf8').replace(/^\uFEFF/, '');
     dosyaVardi = true;
-    ayar = JSON.parse(ham);
+    ayar = ham.trim() === '' ? {} : JSON.parse(ham);
   } catch (e) {
     if (dosyaVardi) {
       // Dosya var ama JSON degil: dokunmadan cik.
@@ -49,21 +50,25 @@ export function kancaKur({
   const liste = Array.isArray(ayar.hooks.UserPromptSubmit)
     ? ayar.hooks.UserPromptSubmit : [];
 
-  const bizimki = (giris) => {
-    const args = giris?.hooks;
-    if (!Array.isArray(args)) return false;
-    return args.some((h) => typeof h?.args?.[0] === 'string'
-      && (h.args[0].endsWith('/cekirdek/kanca.mjs')
-        || h.args[0].endsWith('\\cekirdek\\kanca.mjs')));
-  };
+  const bizimKanca = (h) => typeof h?.args?.[0] === 'string'
+    && (h.args[0].endsWith('/cekirdek/kanca.mjs')
+      || h.args[0].endsWith('\\cekirdek\\kanca.mjs'));
+  // Gruptan yalniz bizim kancamiz cikar; ayni gruptaki baska kancalar korunur,
+  // yalniz bizimkini tasiyan grup duser.
+  const ayikla = (gruplar) => gruplar.flatMap((g) => {
+    if (!Array.isArray(g?.hooks) || !g.hooks.some(bizimKanca)) return [g];
+    const kalan = g.hooks.filter((h) => !bizimKanca(h));
+    return kalan.length ? [{ ...g, hooks: kalan }] : [];
+  });
+  const bizimSayi = liste.reduce(
+    (n, g) => n + (Array.isArray(g?.hooks) ? g.hooks.filter(bizimKanca).length : 0), 0);
 
   let sonraki;
   if (kaldir) {
-    sonraki = liste.filter((g) => !bizimki(g));
-    if (sonraki.length === liste.length) return { degisti: false, kaldirildi: 0 };
+    if (!bizimSayi) return { degisti: false, kaldirildi: 0 };
+    sonraki = ayikla(liste);
   } else {
-    const kalan = liste.filter((g) => !bizimki(g));
-    sonraki = [...kalan, {
+    sonraki = [...ayikla(liste), {
       hooks: [{
         type: 'command',
         command: nodeYolu,
@@ -71,7 +76,7 @@ export function kancaKur({
         timeout: 15,
       }],
     }];
-    if (sonraki.length === liste.length && JSON.stringify(liste) === JSON.stringify(sonraki)) {
+    if (JSON.stringify(liste) === JSON.stringify(sonraki)) {
       return { degisti: false };
     }
   }
@@ -95,6 +100,6 @@ export function kancaKur({
 
   jsonYaz(ayarDosyasi, ayar);
   return kaldir
-    ? { degisti: true, kaldirildi: liste.length - sonraki.length }
+    ? { degisti: true, kaldirildi: bizimSayi }
     : { degisti: true };
 }

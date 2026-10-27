@@ -82,17 +82,14 @@ if [ -n "$BASLANGIC" ]; then
     "$NODE" "$KOK/cekirdek/kota.mjs" ayar baslangic "\"$BASLANGIC\"" > /dev/null
     echo "Başlangıç günü: $BASLANGIC"
 fi
-if [ -n "$PAYLASIM_YAYINLA" ] || [ -n "$PAYLASIM_OKU" ]; then
-    YAYIN='null'
-    OKU='null'
-    if [ -n "$PAYLASIM_YAYINLA" ]; then
-        YAYIN="{\"gist\":\"$PAYLASIM_YAYINLA\",\"dosya\":\"gunluk-kota.json\"}"
-    fi
-    if [ -n "$PAYLASIM_OKU" ]; then
-        OKU="\"$PAYLASIM_OKU\""
-    fi
-    "$NODE" "$KOK/cekirdek/kota.mjs" ayar paylasim "{\"yayinla\":$YAYIN,\"oku\":$OKU}" > /dev/null
-    echo "Paylaşım ayarlandı"
+# Alanlar ayrı yazılır: yalnız --paylasim-oku verilen yeniden kurulum yayını silmez.
+if [ -n "$PAYLASIM_YAYINLA" ]; then
+    "$NODE" "$KOK/cekirdek/kota.mjs" ayar paylasim.yayinla "{\"gist\":\"$PAYLASIM_YAYINLA\",\"dosya\":\"gunluk-kota.json\"}" > /dev/null
+    echo "Paylaşım yayını ayarlandı"
+fi
+if [ -n "$PAYLASIM_OKU" ]; then
+    "$NODE" "$KOK/cekirdek/kota.mjs" ayar paylasim.oku "$PAYLASIM_OKU" > /dev/null
+    echo "Paylaşım okuması ayarlandı"
 fi
 
 # 5) Göstergenin node yolu: launchd PATH içinde /opt/homebrew/bin tutmaz.

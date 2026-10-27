@@ -101,10 +101,10 @@ test('ayar tavan 20 kalici olur, ayar yazimi JSON deger alir', async () => {
     assert.equal(JSON.parse(goster.cikti).tavan, 20);
 
     // Windows kurulumunun yolu: tirnaksiz gist kimligi ic anahtara yazilir.
-    const oku = await calistir(kok, ornek, ['ayar', 'paylasim.oku', '078a0af31443628f21b01e18bab27d48']);
+    const oku = await calistir(kok, ornek, ['ayar', 'paylasim.oku', '0123456789abcdef0123456789abcdef']);
     assert.equal(oku.kod, 0);
     const k3 = JSON.parse(fs.readFileSync(path.join(kok, 'ayar.json'), 'utf8'));
-    assert.deepEqual(k3.paylasim, { yayinla: null, oku: '078a0af31443628f21b01e18bab27d48' });
+    assert.deepEqual(k3.paylasim, { yayinla: null, oku: '0123456789abcdef0123456789abcdef' });
     assert.equal(k3.tavan, 20);
   } finally {
     temizle(kok);
@@ -133,7 +133,9 @@ test('(yok) komutu insan ozeti basar, bar icerir', async () => {
     await calistir(kok, ornek, ['olc', '--sessiz']);
     const r = await calistir(kok, ornek, []);
     assert.equal(r.kod, 0);
-    assert.ok(r.cikti.includes('█') && r.cikti.includes('░'), '20 karakter bar olmali');
+    // Gun basinda bugunun payi sifira yuvarlanabilir: dolu karakter sarti yok, bar 20 karakter.
+    const bar = (r.cikti.match(/[█░]+/) || [''])[0];
+    assert.equal(bar.length, 20, '20 karakter bar olmali');
     assert.ok(r.cikti.includes('Bugün'));
   } finally {
     temizle(kok);
@@ -153,5 +155,24 @@ test('sembol baglanti dizinden cagrilinca durum --json yine calisir', async () =
     assert.equal(d.gun !== undefined, true, 'durum JSON basmali');
   } finally {
     temizle(kok);   // rm -rf baglantiyi izlemez, yalniz baglantiyi siler
+  }
+});
+
+test('ayar: bilinen anahtarlarda yanlis tur reddedilir', async () => {
+  const { kok, ornek } = sahneKur();
+  try {
+    for (const [anahtar, deger] of [['baslangic', '28.10.2026'], ['tavan', '"20"'], ['engel', '"false"'], ['uyari', 'yok']]) {
+      const r = await calistir(kok, ornek, ['ayar', anahtar, deger]);
+      assert.equal(r.kod, 1, `${anahtar} ${deger}`);
+    }
+    for (const [anahtar, deger] of [['baslangic', '2026-10-28'], ['tavan', '0'], ['engel', 'false'], ['baslangic', 'null']]) {
+      const r = await calistir(kok, ornek, ['ayar', anahtar, deger]);
+      assert.equal(r.kod, 0, `${anahtar} ${deger}`);
+    }
+    await calistir(kok, ornek, ['ayar', 'paylasim.oku', '12345678901234567890']);
+    const k = JSON.parse(fs.readFileSync(path.join(kok, 'ayar.json'), 'utf8'));
+    assert.equal(k.paylasim.oku, '12345678901234567890', 'rakamli gist kimligi metin kalmali');
+  } finally {
+    temizle(kok);
   }
 });
